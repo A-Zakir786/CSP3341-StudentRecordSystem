@@ -26,4 +26,39 @@ namespace StudentRecordSystem.Models
         public StudentUser() => Role = "Student";
         public override string GetRoleInfo() => $"Student (ID: {StudentId})";
     }
+    //student profile record entity
+    public class Student
+    {
+        public string StudentId { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string CourseTitle { get; set; } = string.Empty;
+        public int YearLevel { get; set; } = 1;
+    }
+    //Academic course unit entity
+    public class Unit
+    {
+        public string UnitCode { get; set; } = string.Empty;
+        public string UnitTitle { get; set; } = string.Empty;
+        public int CreditPoints { get; set; } = 15;
+    }
+    //Student grade record for a unit
+    public class AcademicRecord
+    {
+        public int RecordId { get; set; }
+        public string StudentId { get; set; } = string.Empty;
+        public string UnitCode { get; set; } = string.Empty;
+        public string UnitTitle { get; set; } = string.Empty;
+        public int CreditPoints { get; set; } = 15;
+        public double Mark { get; set; }
+        public string Grade { get; set; } = "N";
+    }
+    //this Holds calculated academic metrics
+    public class WamResult
+    {
+        public double Wam { get; set; }
+        public double Gpa { get; set; }
+        public int TotalCredits { get; set; }
+        public string Standing { get; set; } = "Good Standing";
+    }
 }
