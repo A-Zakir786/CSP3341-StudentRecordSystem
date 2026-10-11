@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using StudentRecordSystem.Models;
 
 namespace StudentRecordSystem.Services
 {
@@ -97,6 +98,135 @@ namespace StudentRecordSystem.Services
                 ('S002','CSI1241','Systems Analysis',15,66,'CR');";
 
             new SqliteCommand(sql, connection).ExecuteNonQuery();
+        }
+
+        //checks the login details and confirms that the selected role matches
+        public User? Authenticate(string username, string password, string expectedRole)
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            string sql = @"SELECT Id,Username,Password,Role,FullName,StudentId
+                           FROM Users
+                           WHERE LOWER(Username)=LOWER(@username)
+                           AND Password=@password;";
+
+            using var command = new SqliteCommand(sql, connection);
+
+            //Parameters keep the entered values separate from the SQL itself.
+            command.Parameters.AddWithValue("@username", username.Trim());
+            command.Parameters.AddWithValue("@password", password);
+
+            using var reader = command.ExecuteReader();
+
+            //Stop here when the account does not exist or the selected role is wrong.
+            if (!reader.Read() || reader.GetString(3) != expectedRole)
+                return null;
+
+            //Return the correct user object after the account has been verified.
+            if (expectedRole == "Admin")
+                return new AdminUser
+                {
+                    Id = reader.GetInt32(0),
+                    Username = reader.GetString(1),
+                    Password = reader.GetString(2),
+                    FullName = reader.GetString(4)
+                };
+
+            return new StudentUser
+            {
+                Id = reader.GetInt32(0),
+                Username = reader.GetString(1),
+                Password = reader.GetString(2),
+                FullName = reader.GetString(4),
+                StudentId = reader.GetString(5)
+            };
+        }
+
+        //returns all student profiles for the Admin grid.
+        public List<Student> GetStudents()
+        {
+            var students = new List<Student>();
+
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            using var command = new SqliteCommand(
+                "SELECT StudentId,FullName,Email,CourseTitle,YearLevel " +
+                "FROM Students ORDER BY StudentId;",
+                connection);
+
+            using var reader = command.ExecuteReader();
+
+            //convert each database row into a Student object for the interface.
+            while (reader.Read())
+                students.Add(new Student
+                {
+                    StudentId = reader.GetString(0),
+                    FullName = reader.GetString(1),
+                    Email = reader.GetString(2),
+                    CourseTitle = reader.GetString(3),
+                    YearLevel = reader.GetInt32(4)
+                });
+
+            return students;
+        }
+
+        //Adds a new student or updates the existing profile with the same Student ID.
+        public bool SaveStudent(Student student)
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            //The main demo student uses "student"; other students use their ID.
+            string username =
+                student.StudentId == "S001" ? "student" : student.StudentId;
+
+            //The upsert lets the same method handle both adding and editing.
+            string sql = @"
+                INSERT INTO Students VALUES (@id,@name,@email,@course,@year)
+                ON CONFLICT(StudentId) DO UPDATE SET
+                    FullName=@name,
+                    Email=@email,
+                    CourseTitle=@course,
+                    YearLevel=@year;
+
+                INSERT OR IGNORE INTO Users
+                (Username,Password,Role,FullName,StudentId)
+                VALUES (@username,'student123','Student',@name,@id);
+
+                UPDATE Users SET FullName=@name
+                WHERE StudentId=@id AND Role='Student';";
+
+            using var command = new SqliteCommand(sql, connection);
+
+            //Supply the student values separately from the SQL command text.
+            command.Parameters.AddWithValue("@id", student.StudentId);
+            command.Parameters.AddWithValue("@username", username);
+            command.Parameters.AddWithValue("@name", student.FullName);
+            command.Parameters.AddWithValue("@email", student.Email);
+            command.Parameters.AddWithValue("@course", student.CourseTitle);
+            command.Parameters.AddWithValue("@year", student.YearLevel);
+
+            return command.ExecuteNonQuery() > 0;
+        }
+
+        //deletes the selected student together with their login and saved results.
+        public bool DeleteStudent(string studentId)
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            //remove the linked records before removing the student profile.
+            string sql = @"
+                DELETE FROM AcademicRecords WHERE StudentId=@id;
+                DELETE FROM Users WHERE StudentId=@id;
+                DELETE FROM Students WHERE StudentId=@id;";
+
+            using var command = new SqliteCommand(sql, connection);
+            command.Parameters.AddWithValue("@id", studentId);
+
+            return command.ExecuteNonQuery() > 0;
         }
     }
 }
