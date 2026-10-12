@@ -228,5 +228,95 @@ namespace StudentRecordSystem.Services
 
             return command.ExecuteNonQuery() > 0;
         }
+
+        //Returns the units available when entering a grade.
+        public List<Unit> GetUnits()
+        {
+            var units = new List<Unit>();
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+            using var command = new SqliteCommand(
+                "SELECT UnitCode,UnitTitle,CreditPoints " +
+                "FROM Units ORDER BY UnitCode;",
+                connection);
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                units.Add(new Unit
+                {
+                    UnitCode = reader.GetString(0),
+                    UnitTitle = reader.GetString(1),
+                    CreditPoints = reader.GetInt32(2)
+                });
+            return units;
+        }
+
+        //Returns all academic records belonging to one student.
+        public List<AcademicRecord> GetRecords(string studentId)
+        {
+            var records = new List<AcademicRecord>();
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            string sql =
+                @"SELECT RecordId,StudentId,UnitCode,UnitTitle,CreditPoints,Mark,Grade
+                  FROM AcademicRecords
+                  WHERE StudentId=@id
+                  ORDER BY UnitCode;";
+            using var command = new SqliteCommand(sql, connection);
+            command.Parameters.AddWithValue("@id", studentId);
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                records.Add(new AcademicRecord
+                {
+                    RecordId = reader.GetInt32(0),
+                    StudentId = reader.GetString(1),
+                    UnitCode = reader.GetString(2),
+                    UnitTitle = reader.GetString(3),
+                    CreditPoints = reader.GetInt32(4),
+                    Mark = reader.GetDouble(5),
+                    Grade = reader.GetString(6)
+                });
+            return records;
+        }
+
+        //Adds a new grade or updates the same student and unit combination.
+        public bool SaveRecord(AcademicRecord record)
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+
+            //Work out the grade from the mark before saving the result.
+            record.Grade = WamCalculator.GetGrade(record.Mark);
+            string sql = @"
+                INSERT INTO AcademicRecords
+                (StudentId,UnitCode,UnitTitle,CreditPoints,Mark,Grade)
+                VALUES (@studentId,@unitCode,@unitTitle,@credits,@mark,@grade)
+                ON CONFLICT(StudentId,UnitCode) DO UPDATE SET
+                    UnitTitle=@unitTitle,
+                    CreditPoints=@credits,
+                    Mark=@mark,
+                    Grade=@grade;";
+
+            using var command = new SqliteCommand(sql, connection);
+            command.Parameters.AddWithValue("@studentId", record.StudentId);
+            command.Parameters.AddWithValue("@unitCode", record.UnitCode);
+            command.Parameters.AddWithValue("@unitTitle", record.UnitTitle);
+            command.Parameters.AddWithValue("@credits", record.CreditPoints);
+            command.Parameters.AddWithValue("@mark", record.Mark);
+            command.Parameters.AddWithValue("@grade", record.Grade);
+            return command.ExecuteNonQuery() > 0;
+        }
+
+        //Deletes one academic result selected from the Admin records grid.
+        public bool DeleteRecord(int recordId)
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+            using var command = new SqliteCommand(
+                "DELETE FROM AcademicRecords WHERE RecordId=@id;",
+                connection);
+            command.Parameters.AddWithValue("@id", recordId);
+            return command.ExecuteNonQuery() > 0;
+        }
     }
 }
