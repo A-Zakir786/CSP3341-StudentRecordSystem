@@ -47,7 +47,8 @@ namespace StudentRecordSystem.Forms
                 heading,
                 signOut
             });
-            //Load the existing student profiles when the form opens.
+            //Load the existing data when the form opens.
+            LoadUnits();
             LoadStudents();
         }
 
@@ -97,6 +98,8 @@ namespace StudentRecordSystem.Forms
             _mark.Width = 100;
             var saveGrade = CreateButton("Add / Update Grade", 520, 525, 150);
             var deleteGrade = CreateButton("Delete Grade", 680, 525, 120);
+            saveGrade.Click += SaveGrade;
+            deleteGrade.Click += DeleteGrade;
             Controls.AddRange(new Control[]
             {
                 _summary,
@@ -110,7 +113,7 @@ namespace StudentRecordSystem.Forms
             });
         }
 
-        //Applies the common read-only display settings to both grids.
+        //Applies the common read only display settings to both grids.
         private static void SetupGrid(DataGridView grid)
         {
             grid.ReadOnly = true;
@@ -164,6 +167,18 @@ namespace StudentRecordSystem.Forms
             }
         }
 
+        //Loads the available units into the grade selector.
+        private void LoadUnits()
+        {
+            _unit.Items.Clear();
+
+            foreach (Unit unit in _db.GetUnits())
+                _unit.Items.Add($"{unit.UnitCode} - {unit.UnitTitle}");
+
+            if (_unit.Items.Count > 0)
+                _unit.SelectedIndex = 0;
+        }        
+
         //Copies the selected student's profile into the edit controls.
         private void ShowSelectedStudent()
         {
@@ -177,6 +192,8 @@ namespace StudentRecordSystem.Forms
             _email.Text = student.Email;
             _course.Text = student.CourseTitle;
             _year.Value = student.YearLevel;
+
+            ShowRecords(student);
         }
 
         //Returns the student currently selected in the grid.
@@ -271,6 +288,88 @@ namespace StudentRecordSystem.Forms
             }
 
             LoadStudents();
+        }
+
+        //Displays the selected student's records and calculated summary.
+        private void ShowRecords(Student student)
+        {
+            var records = _db.GetRecords(student.StudentId);
+            _records.DataSource = records;
+
+            WamResult result = WamCalculator.Calculate(records);
+
+            _summary.Text =
+                $"WAM: {result.Wam}%    GPA: {result.Gpa}    " +
+                $"Classification: {result.Standing}";
+        }
+
+        //Adds a new grade or updates the result for the selected unit.
+        private void SaveGrade(object? sender, EventArgs e)
+        {
+            Student? student = GetSelectedStudent();
+
+            if (student == null)
+            {
+                MessageBox.Show("Select a student first.");
+                return;
+            }
+
+            if (_unit.SelectedItem == null) return;
+
+            string code =
+                _unit.SelectedItem.ToString()!
+                    .Split('-')[0]
+                    .Trim();
+
+            Unit? unit = _db.GetUnits()
+                .FirstOrDefault(u => u.UnitCode == code);
+
+            if (unit == null) return;
+
+            var record = new AcademicRecord
+            {
+                StudentId = student.StudentId,
+                UnitCode = unit.UnitCode,
+                UnitTitle = unit.UnitTitle,
+                CreditPoints = unit.CreditPoints,
+                Mark = (double)_mark.Value
+            };
+
+            if (!_db.SaveRecord(record))
+            {
+                MessageBox.Show("The grade could not be saved.");
+                return;
+            }
+
+            ShowRecords(student);
+        }
+
+        //Deletes the academic result selected in the records grid.
+        private void DeleteGrade(object? sender, EventArgs e)
+        {
+            Student? student = GetSelectedStudent();
+
+            if (student == null)
+            {
+                MessageBox.Show("Select a student first.");
+                return;
+            }
+
+            if (_records.SelectedRows.Count == 0 ||
+                _records.SelectedRows[0].DataBoundItem
+                    is not AcademicRecord record)
+            {
+                MessageBox.Show("Select a grade first.");
+                return;
+            }
+
+            if (!_db.DeleteRecord(record.RecordId))
+            {
+                MessageBox.Show("The grade could not be deleted.");
+                return;
+            }
+
+            ShowRecords(student);
         }
     }
 }
