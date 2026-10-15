@@ -1,16 +1,22 @@
+using StudentRecordSystem.Forms;
+using StudentRecordSystem.Services;
+
 namespace StudentRecordSystem;
 
 static class Program
 {
-    /// <summary>
-    ///  The main entry point for the application.
-    /// </summary>
+    //Main entry point for the application.
     [STAThread]
     static void Main()
     {
-        // To customize application configuration such as set high DPI settings or default font,
-        // see https://aka.ms/applicationconfiguration.
         ApplicationConfiguration.Initialize();
-        Application.Run(new Form1());
-    }    
+
+        //Prepare the database and demo data.
+        var db = new DatabaseService();
+        db.Initialize();
+
+        //Open the first screen.
+        Application.Run(new RoleSelectForm(db));
+    }
 }
+
