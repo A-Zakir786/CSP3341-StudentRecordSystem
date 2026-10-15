@@ -44,21 +44,14 @@ namespace StudentRecordSystem.Forms
             {
                 Text = "Password:", Location = new Point(35, 130), AutoSize = true
             };
+
             _password.Location = new Point(35, 152);
             _password.Width = 330;
             _password.UseSystemPasswordChar = true;
 
-            //Allow the entered password to be temporarily shown or hidden.
-            var showPassword = new CheckBox
-            {
-                Text = "Show password", Location = new Point(35, 185), AutoSize = true
-            };
-            showPassword.CheckedChanged += (_, _) =>
-                _password.UseSystemPasswordChar = !showPassword.Checked;
-
             var signIn = new Button
             {
-                Text = "Sign In", Location = new Point(35, 215), Size = new Size(120, 32)
+                Text = "Sign In", Location = new Point(35, 190), Size = new Size(120, 32)
             };
             signIn.Click += SignIn;
 
@@ -78,7 +71,7 @@ namespace StudentRecordSystem.Forms
             Controls.AddRange(new Control[]
             {
                 heading, usernameLabel, _username,
-                passwordLabel, _password, showPassword,
+                passwordLabel, _password,
                 signIn, _status, demo
             });
 
